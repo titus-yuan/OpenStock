@@ -87,6 +87,35 @@ export async function getCompanyProfile(symbol: string) {
     }
 }
 
+type FinnhubCandles = {
+    c?: number[];          // close prices
+    h?: number[];          // high prices
+    l?: number[];          // low prices
+    o?: number[];          // open prices
+    v?: number[];          // volume
+    t?: number[];          // unix timestamps (seconds)
+    s?: 'ok' | 'no_data';  // status
+};
+
+export async function getStockCandles(
+    symbol: string,
+    resolution: 'D' | 'W' | 'M' | '1' | '5' | '15' | '30' | '60' = 'D',
+    fromDaysBack: number = 365
+) {
+    try {
+        const token = NEXT_PUBLIC_FINNHUB_API_KEY;
+        const now = Math.floor(Date.now() / 1000);
+        const from = now - fromDaysBack * 24 * 60 * 60;
+        const url = `${FINNHUB_BASE_URL}/stock/candle?symbol=${encodeURIComponent(symbol)}&resolution=${resolution}&from=${from}&to=${now}&token=${token}`;
+        // Cache 5 minutes for candles (intraday) or longer for daily
+        const cacheSeconds = resolution === 'D' || resolution === 'W' || resolution === 'M' ? 3600 : 300;
+        return await fetchJSON<FinnhubCandles>(url, cacheSeconds);
+    } catch (e) {
+        console.error('Error fetching candles for', symbol, e);
+        return null;
+    }
+}
+
 export async function getWatchlistData(symbols: string[]) {
     if (!symbols || symbols.length === 0) return [];
 

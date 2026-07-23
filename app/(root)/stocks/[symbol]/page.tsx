@@ -1,4 +1,5 @@
 import TradingViewWidget from "@/components/TradingViewWidget";
+import CandlestickChart from "@/components/CandlestickChart";
 import WatchlistButton from "@/components/WatchlistButton";
 import StockSentimentCard from "@/components/stocks/StockSentimentCard";
 import {
@@ -20,6 +21,7 @@ export default async function StockDetails({ params }: StockDetailsPageProps) {
     const { symbol } = await params;
     const tvSymbol = formatSymbolForTradingView(symbol);
     const scriptUrl = `https://s3.tradingview.com/external-embedding/embed-widget-`;
+    const finnhubKey = process.env.NEXT_PUBLIC_FINNHUB_API_KEY ?? '';
 
     const session = await auth.api.getSession({
         headers: await headers()
@@ -41,13 +43,15 @@ export default async function StockDetails({ params }: StockDetailsPageProps) {
                         height={170}
                     />
 
-                    <TradingViewWidget
-                        scriptUrl={`${scriptUrl}advanced-chart.js`}
-                        config={CANDLE_CHART_WIDGET_CONFIG(tvSymbol)}
-                        className="custom-chart"
-                        height={600}
-                        allowExpand={true}
-                    />
+                    {/* Candlestick chart - replaced with lightweight-charts (TradingView widget dead) */}
+                    <div className="custom-chart rounded-lg overflow-hidden border border-white/10 bg-[#141414]">
+                        <CandlestickChart
+                            symbol={symbol.toUpperCase()}
+                            resolution="D"
+                            fromDaysBack={365}
+                            height={600}
+                        />
+                    </div>
 
                     <TradingViewWidget
                         scriptUrl={`${scriptUrl}advanced-chart.js`}
