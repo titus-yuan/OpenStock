@@ -1,5 +1,8 @@
 import TradingViewWidget from "@/components/TradingViewWidget";
 import CandlestickChart from "@/components/CandlestickChart";
+import SymbolInfo from "@/components/SymbolInfo";
+import CompanyProfile from "@/components/CompanyProfile";
+import StockNews from "@/components/StockNews";
 import WatchlistButton from "@/components/WatchlistButton";
 import StockSentimentCard from "@/components/stocks/StockSentimentCard";
 import {
@@ -37,29 +40,26 @@ export default async function StockDetails({ params }: StockDetailsPageProps) {
             <section className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full">
                 {/* Left column */}
                 <div className="flex flex-col gap-6">
-                    <TradingViewWidget
-                        scriptUrl={`${scriptUrl}symbol-info.js`}
-                        config={SYMBOL_INFO_WIDGET_CONFIG(tvSymbol)}
-                        height={170}
-                    />
+                    {/* 1. Symbol Info — Finnhub /quote */}
+                    <SymbolInfo symbol={symbol.toUpperCase()} apiKey={finnhubKey} height={170} />
 
-                    {/* Candlestick chart - replaced with lightweight-charts (TradingView widget dead) */}
-                    <div className="custom-chart rounded-lg overflow-hidden border border-white/10 bg-[#141414]">
+                    {/* 2. Candle Chart — lightweight-charts + Finnhub */}
+                    <div className="custom-chart rounded-lg overflow-hidden">
                         <CandlestickChart
                             symbol={symbol.toUpperCase()}
-                            resolution="D"
-                            fromDaysBack={365}
+                            apiKey={finnhubKey}
                             height={600}
                         />
                     </div>
 
-                    <TradingViewWidget
-                        scriptUrl={`${scriptUrl}advanced-chart.js`}
-                        config={BASELINE_WIDGET_CONFIG(tvSymbol)}
-                        className="custom-chart"
-                        height={600}
-                        allowExpand={true}
-                    />
+                    {/* 3. Baseline Chart — same as Candle (Finnhub fallback) */}
+                    <div className="custom-chart rounded-lg overflow-hidden">
+                        <CandlestickChart
+                            symbol={symbol.toUpperCase()}
+                            apiKey={finnhubKey}
+                            height={600}
+                        />
+                    </div>
                 </div>
 
                 {/* Right column */}
@@ -75,23 +75,33 @@ export default async function StockDetails({ params }: StockDetailsPageProps) {
 
                     <StockSentimentCard insight={sentimentInsights} />
 
-                    <TradingViewWidget
-                        scriptUrl={`${scriptUrl}technical-analysis.js`}
-                        config={TECHNICAL_ANALYSIS_WIDGET_CONFIG(tvSymbol)}
-                        height={400}
-                    />
+                    {/* 4. Technical Analysis — placeholder (Finnhub free tier has no indicators) */}
+                    <div className="rounded-lg border border-white/10 bg-[#141414] p-6" style={{ minHeight: 400 }}>
+                        <h3 className="text-lg font-semibold text-white mb-2">Technical Analysis</h3>
+                        <p className="text-sm text-gray-400 mb-2">
+                            Free tier does not include technical indicators (RSI / MACD / etc).
+                        </p>
+                        <p className="text-xs text-gray-500">
+                            Finnhub /indicator endpoint is paid-only. To enable, upgrade to a paid Finnhub plan.
+                        </p>
+                    </div>
 
-                    <TradingViewWidget
-                        scriptUrl={`${scriptUrl}company-profile.js`}
-                        config={COMPANY_PROFILE_WIDGET_CONFIG(tvSymbol)}
-                        height={440}
-                    />
+                    {/* 5. Company Profile — Finnhub /stock/profile2 */}
+                    <CompanyProfile symbol={symbol.toUpperCase()} apiKey={finnhubKey} height={440} />
 
-                    <TradingViewWidget
-                        scriptUrl={`${scriptUrl}financials.js`}
-                        config={COMPANY_FINANCIALS_WIDGET_CONFIG(tvSymbol)}
-                        height={800}
-                    />
+                    {/* 6. Company Financials — placeholder (Finnhub /financials is paid) */}
+                    <div className="rounded-lg border border-white/10 bg-[#141414] p-6" style={{ minHeight: 200 }}>
+                        <h3 className="text-lg font-semibold text-white mb-2">Company Financials</h3>
+                        <p className="text-sm text-gray-400 mb-2">
+                            Free tier does not include detailed financials.
+                        </p>
+                        <p className="text-xs text-gray-500">
+                            See key stats in <strong>Company Profile</strong> above (Market Cap, Currency, etc).
+                        </p>
+                    </div>
+
+                    {/* 7. Stock News — Finnhub /company-news */}
+                    <StockNews symbol={symbol.toUpperCase()} apiKey={finnhubKey} height={800} />
                 </div>
             </section>
         </div>

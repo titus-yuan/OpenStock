@@ -1,73 +1,38 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { createChart, LineSeries, AreaSeries, ColorType } from 'lightweight-charts';
+import { createChart, AreaSeries, ColorType, LineSeries } from 'lightweight-charts';
 
 interface CandlestickChartProps {
     symbol: string;
+    apiKey?: string;
     height?: number;
-    resolution?: 'D' | 'W' | 'M';
-    fromDaysBack?: number;
-}
-
-interface YahooChartResponse {
-    chart?: {
-        result?: Array<{
-            meta?: { symbol?: string };
-            timestamp?: number[];
-            indicators?: {
-                quote?: Array<{
-                    open?: (number | null)[];
-                    high?: (number | null)[];
-                    low?: (number | null)[];
-                    close?: (number | null)[];
-                    volume?: (number | null)[];
-                }>;
-            };
-        }>;
-        error?: { code: string; description: string } | null;
-    };
 }
 
 interface FinnhubQuote {
-    c?: number;
-    d?: number;
-    dp?: number;
-    h?: number;
-    l?: number;
-    o?: number;
-    pc?: number;
+    c?: number;   // current
+    pc?: number;  // previous close
+    h?: number;   // high
+    l?: number;   // low
+    o?: number;   // open
+    d?: number;   // change
+    dp?: number;  // change percent
+    t?: number;   // timestamp
 }
 
-export default function CandlestickChart({
-    symbol,
-    height = 500,
-    resolution = 'D',
-    fromDaysBack = 365,
-}: CandlestickChartProps) {
+export default function CandlestickChart({ symbol, apiKey, height = 500 }: CandlestickChartProps) {
     const containerRef = useRef<HTMLDivElement | null>(null);
-    const [error, setError] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
-    const [dataSource, setDataSource] = useState<'yahoo' | 'finnhub'>('yahoo');
+    const [error, setError] = useState<string | null>(null);
+    const [dataSource, setDataSource] = useState<'finnhub' | 'sparkline'>('finnhub');
+    const [quote, setQuote] = useState<FinnhubQuote | null>(null);
 
     useEffect(() => {
         if (!containerRef.current) return;
         setLoading(true);
         setError(null);
 
-        const yahooInterval = resolution === 'W' ? '1wk' : resolution === 'M' ? '1mo' : '1d';
-        const yahooRange =
-            fromDaysBack <= 30 ? '1mo' :
-            fromDaysBack <= 90 ? '3mo' :
-            fromDaysBack <= 180 ? '6mo' :
-            fromDaysBack <= 365 ? '1y' :
-            fromDaysBack <= 730 ? '2y' :
-            '5y';
-
-        // Use our own Next.js API route as proxy to avoid Yahoo rate limits on direct fetch
-        const yahooUrl = `/api/yahoo/${encodeURIComponent(symbol)}?interval=${yahooInterval}&range=${yahooRange}`;
-
-        const renderAreaChart = (dataPoints: { time: any; value: number }[], source: 'yahoo' | 'finnhub') => {
+        const renderChart = (dataPoints: { time: any; value: number }[], source: 'finnhub' | 'sparkline', q?: FinnhubQuote) => {
             if (!containerRef.current || dataPoints.length === 0) return;
 
             const chart = createChart(containerRef.current, {
@@ -89,10 +54,15 @@ export default function CandlestickChart({
                 rightPriceScale: { borderColor: '#2B2B43' },
             });
 
+            const isUp = (q?.d ?? 0) >= 0;
+            const lineColor = isUp ? '#0FEDBE' : '#FF5757';
+            const topColor = isUp ? 'rgba(15, 237, 190, 0.4)' : 'rgba(255, 87, 87, 0.4)';
+            const bottomColor = isUp ? 'rgba(15, 237, 190, 0.05)' : 'rgba(255, 87, 87, 0.05)';
+
             const areaSeries = chart.addSeries(AreaSeries, {
-                lineColor: '#0FEDBE',
-                topColor: 'rgba(15, 237, 190, 0.4)',
-                bottomColor: 'rgba(15, 237, 190, 0.05)',
+                lineColor,
+                topColor,
+                bottomColor,
                 lineWidth: 2,
             });
             areaSeries.setData(dataPoints);
@@ -107,66 +77,37 @@ export default function CandlestickChart({
             (containerRef.current as any)._chart = chart;
             (containerRef.current as any)._ro = ro;
             setDataSource(source);
+            setQuote(q || null);
             setLoading(false);
         };
 
-        // Try Yahoo Finance first
-        fetch(yahooUrl)
-            .then((res) => {
-                if (!res.ok) throw new Error(`Yahoo HTTP ${res.status}`);
-                return res.json() as Promise<YahooChartResponse>;
-            })
-            .then((data) => {
-                const err = data.chart?.error;
-                if (err) throw new Error(`Yahoo: ${err.description}`);
-                const result = data.chart?.result?.[0];
-                if (!result || !result.timestamp || result.timestamp.length === 0) {
-                    throw new Error('No data from Yahoo');
-                }
-                const timestamps = result.timestamp!;
-                const quote = result.indicators?.quote?.[0];
-                if (!quote) throw new Error('Missing quote data');
-
-                const dataPoints: { time: any; value: number }[] = [];
-                for (let i = 0; i < timestamps.length; i++) {
-                    const close = quote.close?.[i];
-                    if (close == null) continue;
-                    dataPoints.push({
-                        time: timestamps[i] as any,
-                        value: close,
-                    });
-                }
-                if (dataPoints.length === 0) throw new Error('No valid close prices');
-                renderAreaChart(dataPoints, 'yahoo');
-            })
-            .catch((yahooErr) => {
-                // Fallback: Finnhub quote only (current price, single point)
-                console.warn('Yahoo failed, falling back to Finnhub:', yahooErr);
-                const finnhubKey = process.env.NEXT_PUBLIC_FINNHUB_API_KEY;
-                if (!finnhubKey) {
-                    throw new Error(`Yahoo failed (${yahooErr.message}); no Finnhub key for fallback`);
-                }
-                return fetch(`https://finnhub.io/api/v1/quote?symbol=${encodeURIComponent(symbol)}&token=${finnhubKey}`)
-                    .then((res) => res.json() as Promise<FinnhubQuote>)
-                    .then((q) => {
-                        if (!q.c) throw new Error('No quote from Finnhub');
-                        // Single point chart - show current price as flat line
-                        const now = Math.floor(Date.now() / 1000);
-                        const dayAgo = now - 86400;
-                        renderAreaChart(
-                            [
-                                { time: dayAgo as any, value: q.pc ?? q.c },
-                                { time: now as any, value: q.c },
-                            ],
-                            'finnhub'
-                        );
-                    });
-            })
-            .catch((finalErr) => {
-                console.error('Chart error:', finalErr);
-                setError(finalErr instanceof Error ? finalErr.message : String(finalErr));
-                setLoading(false);
-            });
+        // Try Finnhub /quote (current snapshot — 2 data points: prev close + current)
+        if (apiKey) {
+            fetch(`https://finnhub.io/api/v1/quote?symbol=${encodeURIComponent(symbol)}&token=${apiKey}`)
+                .then((res) => {
+                    if (!res.ok) throw new Error(`Finnhub HTTP ${res.status}`);
+                    return res.json() as Promise<FinnhubQuote>;
+                })
+                .then((q) => {
+                    if (!q.c) throw new Error('No quote data from Finnhub');
+                    // Synthesize: 2-point area chart (prev close → current)
+                    const now = Math.floor(Date.now() / 1000);
+                    const dayAgo = now - 86400;
+                    const dataPoints = [
+                        { time: dayAgo as any, value: q.pc ?? q.c },
+                        { time: now as any, value: q.c },
+                    ];
+                    renderChart(dataPoints, 'finnhub', q);
+                })
+                .catch((err) => {
+                    console.error('Finnhub chart fetch failed:', err);
+                    setError(err instanceof Error ? err.message : String(err));
+                    setLoading(false);
+                });
+        } else {
+            setError('No Finnhub API key configured');
+            setLoading(false);
+        }
 
         return () => {
             if (containerRef.current) {
@@ -178,27 +119,36 @@ export default function CandlestickChart({
                 (containerRef.current as any)._ro = null;
             }
         };
-    }, [symbol, height, resolution, fromDaysBack]);
+    }, [symbol, apiKey, height]);
+
+    const fmt = (n?: number) => (n == null ? '—' : n.toFixed(2));
+    const isUp = (quote?.d ?? 0) >= 0;
 
     return (
         <div className="relative w-full" style={{ height }}>
             {loading && (
                 <div className="absolute inset-0 flex items-center justify-center text-gray-400 z-10 bg-black/40 rounded">
-                    📊 Loading {symbol} chart...
+                    📊 Loading {symbol} chart from Finnhub...
                 </div>
             )}
             {error && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center text-red-400 z-10 bg-black/40 rounded p-4">
-                    <p className="text-sm mb-2">⚠️ Failed to load chart</p>
+                    <p className="text-sm mb-2">⚠️ Chart unavailable</p>
                     <p className="text-xs text-gray-500">{error}</p>
                 </div>
             )}
             <div ref={containerRef} className="w-full rounded" style={{ height }} />
-            {dataSource === 'finnhub' && !loading && (
-                <div className="absolute bottom-2 right-2 text-xs text-gray-500 bg-black/60 px-2 py-1 rounded">
-                    Source: Finnhub (current price only)
+            {dataSource === 'finnhub' && !loading && quote && (
+                <div className="absolute top-2 left-2 bg-black/70 px-3 py-1.5 rounded text-xs">
+                    <div className="text-white font-semibold">${fmt(quote.c)}</div>
+                    <div className={isUp ? 'text-emerald-400' : 'text-rose-400'}>
+                        {isUp ? '▲' : '▼'} {fmt(quote.d)} ({fmt(quote.dp)}%)
+                    </div>
                 </div>
             )}
+            <div className="absolute bottom-2 right-2 text-xs text-gray-500 bg-black/60 px-2 py-1 rounded">
+                Source: Finnhub /quote (free tier — 2-point snapshot)
+            </div>
         </div>
     );
 }

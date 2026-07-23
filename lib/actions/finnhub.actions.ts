@@ -116,6 +116,36 @@ export async function getStockCandles(
     }
 }
 
+export type FinnhubNewsArticle = {
+    id?: number;
+    category?: string;
+    datetime?: number;
+    headline?: string;
+    image?: string;
+    related?: string;
+    source?: string;
+    summary?: string;
+    url?: string;
+};
+
+export async function getCompanyNews(
+    symbol: string,
+    daysBack: number = 7
+): Promise<FinnhubNewsArticle[]> {
+    try {
+        const token = NEXT_PUBLIC_FINNHUB_API_KEY;
+        const now = new Date();
+        const from = new Date(now.getTime() - daysBack * 24 * 60 * 60 * 1000);
+        const fmt = (d: Date) => d.toISOString().slice(0, 10);
+        const url = `${FINNHUB_BASE_URL}/company-news?symbol=${encodeURIComponent(symbol)}&from=${fmt(from)}&to=${fmt(now)}&token=${token}`;
+        // Cache news for 1 hour
+        return await fetchJSON<FinnhubNewsArticle[]>(url, 3600);
+    } catch (e) {
+        console.error('Error fetching news for', symbol, e);
+        return [];
+    }
+}
+
 export async function getWatchlistData(symbols: string[]) {
     if (!symbols || symbols.length === 0) return [];
 
