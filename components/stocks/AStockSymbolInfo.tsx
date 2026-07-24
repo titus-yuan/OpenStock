@@ -57,17 +57,32 @@ export default function AStockSymbolInfo({ symbol, height = 170 }: Props) {
         const fetchData = async () => {
             try {
                 setLoading(true);
-                // 1. 拉 1 天的 daily
-                const dailyRes = await fetch(`/api/tushare/daily?ts_code=${tsCode}&limit=1`);
-                if (!dailyRes.ok) throw new Error(`daily HTTP ${dailyRes.status}`);
-                const dailyData = await dailyRes.json();
-                if (dailyData.ok && dailyData.data && dailyData.data.length > 0) {
+
+                // 1. 拉最新 1 条 daily(用 trade_date 倒推避免 1 年 start_date 限制)
+                //    注:不能用 days_back=365,Tushare 范围太大会返回 1 年前数据
+                //    改用 trade_date 直接查最新交易日
+                const fmt = (d: Date) => `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
+                const today = new Date();
+                let dailyData: any = null;
+                for (let i = 0; i < 5; i++) {
+                    const tradeDate = fmt(new Date(today.getTime() - i * 24 * 60 * 60 * 1000));
+                    const dailyRes = await fetch(`/api/tushare/daily?ts_code=${tsCode}&trade_date=${tradeDate}`);
+                    if (dailyRes.ok) {
+                        const json = await dailyRes.json();
+                        if (json.ok && json.data && json.data.length > 0) {
+                            dailyData = { data: json.data, tradeDate };
+                            break;
+                        }
+                    }
+                }
+
+                if (dailyData && dailyData.data && dailyData.data.length > 0) {
                     setQuote(dailyData.data[0]);
                 }
 
                 // 2. 拉 daily_basic(同日)
-                if (dailyData.data && dailyData.data[0]) {
-                    const tradeDate = dailyData.data[0].trade_date;
+                if (dailyData && dailyData.data && dailyData.data[0]) {
+                    const tradeDate = dailyData.tradeDate;
                     const basicRes = await fetch(`/api/tushare/daily_basic?ts_code=${tsCode}&trade_date=${tradeDate}`);
                     if (basicRes.ok) {
                         const basicData = await basicRes.json();
