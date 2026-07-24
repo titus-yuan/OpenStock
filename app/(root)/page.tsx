@@ -2,9 +2,8 @@
  * A 股首页 ── 2 列等高 grid 布局
  *
  * 布局:
- * - 左列(5/12):A 股主要指数 + 4 tab(资金/换手/涨停/跌停)
- * - 右列(7/12):Heatmap(高度跟左列一致)
- * - 下方:活跃股 + 财经新闻(2 列)
+ * - 上半:左列 5/12 (A 股主要指数 + 4 tab) + 右列 7/12 (Heatmap) ── 等高
+ * - 下半:活跃股 7/12 + 财经新闻 5/12 ── 等高
  *
  * 高度对齐:左列 flex column,指数顶部 + 4 tab flex-1
  *           Heatmap h-full,自动跟随父容器高度
@@ -18,7 +17,7 @@ import AStockMarketStats from "@/components/market/AStockMarketStats";
 
 const Home = () => {
     return (
-        <div className="flex min-h-screen home-wrapper p-4 gap-4">
+        <div className="flex flex-col min-h-screen home-wrapper p-4 gap-4">
             {/* 上半部分:左列 5/12 + 右列 7/12 ── 等高 */}
             <section className="grid grid-cols-12 gap-4 w-full" style={{ minHeight: '700px' }}>
                 {/* 左列(5/12) */}
@@ -34,6 +33,16 @@ const Home = () => {
                 {/* 右列(7/12) ── Heatmap */}
                 <div className="col-span-12 lg:col-span-7">
                     <Heatmap />
+                </div>
+            </section>
+
+            {/* 下半部分:活跃股 7/12 + 财经新闻 5/12 ── 等高 */}
+            <section className="grid grid-cols-12 gap-4 w-full" style={{ minHeight: '500px' }}>
+                <div className="col-span-12 lg:col-span-7 h-full">
+                    <MarketQuotes />
+                </div>
+                <div className="col-span-12 lg:col-span-5 h-full">
+                    <NewsTimeline />
                 </div>
             </section>
         </div>
