@@ -3,7 +3,7 @@ import { NEWS_SUMMARY_EMAIL_PROMPT, PERSONALIZED_WELCOME_EMAIL_PROMPT } from "@/
 import { sendNewsSummaryEmail, sendWelcomeEmail } from "@/lib/nodemailer";
 import { getAllUsersForNewsEmail } from "@/lib/actions/user.actions";
 import { getWatchlistSymbolsByEmail } from "@/lib/actions/watchlist.actions";
-import { getNews } from "@/lib/actions/finnhub.actions";
+import { getMajorNews } from "@/lib/tushare/actions";
 import { getFormattedTodayDate } from "@/lib/utils";
 import { callAIProviderWithFallback } from "@/lib/ai-provider";
 
@@ -58,9 +58,7 @@ export const sendWeeklyNewsSummary = inngest.createFunction(
     async ({ step }) => {
         // Step 1: Fetch General Market News
         const articles = await step.run('fetch-general-news', async () => {
-            const { getNews } = await import("@/lib/actions/finnhub.actions");
-            const news = await getNews();
-            // Ideally getNews would accept range, but getting latest 10 is good for summary
+            const news = await getMajorNews(7);
             return (news || []).slice(0, 10);
         });
 
@@ -230,15 +228,17 @@ export const checkStockAlerts = inngest.createFunction(
 
         // Step 3: Fetch prices
         const prices = await step.run('fetch-prices', async () => {
-            const { getQuote } = await import("@/lib/actions/finnhub.actions");
+            const { getWatchlistQuotes } = await import("@/lib/actions/watchlist-tushare.actions");
+            const { isChineseStock } = await import("@/lib/tushare/mapping");
             const priceMap: Record<string, number> = {};
 
             // Process in chunks to be safe
             for (const sym of symbols) {
                 try {
-                    const quote = await getQuote(sym as string);
-                    if (quote && quote.c) {
-                        priceMap[sym as string] = quote.c;
+                    if (!isChineseStock(sym as string)) continue;  // 跳过非 A 股
+                    const quote = await getWatchlistQuotes([{ symbol: sym as string, name: '' }]);
+                    if (quote && quote.length > 0) {
+                        priceMap[sym as string] = quote[0].price;
                     }
                 } catch (e) {
                     console.error(`Failed to fetch price for ${sym}`, e);

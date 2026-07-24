@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { removeFromWatchlist } from "@/lib/actions/watchlist.actions";
-import { getQuote } from "@/lib/actions/finnhub.actions";
+import { getWatchlistQuotes } from "@/lib/actions/watchlist-tushare.actions";
 import { Bell, Loader2, X } from "lucide-react";
 import CreateAlertModal from "./CreateAlertModal";
 
@@ -19,12 +19,11 @@ export default function WatchlistStockChip({ symbol, userId }: WatchlistStockChi
     const handleBellClick = async () => {
         setLoadingPrice(true);
         try {
-            const data = await getQuote(symbol);
-            if (data && data.c) {
-                setPrice(data.c);
+            const quotes = await getWatchlistQuotes([{ symbol, name: '' }]);
+            if (quotes && quotes.length > 0) {
+                setPrice(quotes[0].price);
                 setModalOpen(true);
             } else {
-                // Fallback if fetch fails
                 setPrice(0);
                 setModalOpen(true);
             }

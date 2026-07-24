@@ -26,7 +26,7 @@ export default function HelpPage() {
     },
     {
       question: "Where does the market data come from?",
-      answer: "We partner with Finnhub and other providers to offer real-time and delayed data. While robust, please use it for analysis rather than high-frequency trading."
+      answer: "We use Tushare Pro (中国 A 股 5000 积分档) 提供股票数据。虽然稳健,请用于分析而非高频交易。"
     },
     {
       question: "Can I contribute code or designs?",

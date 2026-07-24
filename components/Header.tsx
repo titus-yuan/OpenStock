@@ -2,10 +2,10 @@ import Link from "next/link";
 import Image from "next/image";
 import NavItems from "@/components/NavItems";
 import UserDropdown from "@/components/UserDropdown";
-import {searchStocks} from "@/lib/actions/finnhub.actions";
+import { getPopularChineseStocks } from "@/lib/actions/hybrid-search.actions";
 
 const Header = async ({ user }: { user: User }) => {
-    const initialStocks = await searchStocks();
+    const initialStocks = await getPopularChineseStocks();
 
     return (
         <header className="sticky top-0 header">

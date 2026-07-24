@@ -178,14 +178,14 @@ export default function ApiDocsPage() {
 
         <div className="grid gap-4">
           <StackItem
-            title="Finnhub"
-            desc="Real-time quotes, technical indicators, and market news."
-            url="https://finnhub.io"
+            title="Tushare Pro"
+            desc="A 股全市场数据(5000 积分档):股票基础/日线/复权/财务/指数/新闻。"
+            url="https://tushare.pro"
           />
           <StackItem
-            title="ConvertKit (Kit)"
-            desc="High-volume newsletter broadcasts and user tagging."
-            url="https://kit.com"
+            title="Lightweight Charts"
+            desc="TradingView 开源 K 线图库(本地 npm 包,无 CDN 依赖)。"
+            url="https://tradingview.github.io/lightweight-charts/"
           />
           <StackItem
             title="MongoDB Atlas"

@@ -5,7 +5,7 @@ import { CommandDialog, CommandEmpty, CommandInput, CommandList } from "@/compon
 import {Button} from "@/components/ui/button";
 import {Loader2,  TrendingUp} from "lucide-react";
 import Link from "next/link";
-import {hybridSearchStocks, type HybridSearchResult} from "@/lib/actions/hybrid-search.actions";
+import {searchStocksOnly, type SearchResult} from "@/lib/actions/hybrid-search.actions";
 import {useDebounce} from "@/hooks/useDebounce";
 
 export default function SearchCommand({ renderAs = 'button', label = 'Add stock', initialStocks }: SearchCommandProps) {
@@ -33,9 +33,9 @@ export default function SearchCommand({ renderAs = 'button', label = 'Add stock'
 
         setLoading(true)
         try {
-            const results = await hybridSearchStocks(searchTerm.trim());
+            const results = await searchStocksOnly(searchTerm.trim());
             // 转成 StockWithWatchlistStatus 格式
-            const mapped: StockWithWatchlistStatus[] = results.map((r: HybridSearchResult) => ({
+            const mapped: StockWithWatchlistStatus[] = results.map((r: SearchResult) => ({
                 symbol: r.symbol,
                 name: r.name,
                 exchange: r.exchange,
