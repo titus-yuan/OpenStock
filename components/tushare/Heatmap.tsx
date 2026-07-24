@@ -1,17 +1,13 @@
 /**
- * A 股全市场热力图(按行业分组 + 市值大小 + 涨跌色)
+ * A 股热力图(OpenStock 风格)
  *
- * 用 d3-hierarchy treemap + squarify 算法:
- * - 面积 ∝ 市值(D3 squarify 自动切方块)
- * - 行业大块 → 行业总市值比例
- * - 颜色 ∝ 涨跌幅(红涨绿跌,A 股惯例)
- *
- * 优化 (2026-07-24):
- * - 每行业股票数 30 → 50(填满更多空间)
- * - paddingTop 20 → 16
- * - paddingInner 2 → 1
- * - paddingOuter 3 → 2
- * - 行业数 16 → 18
+ * 设计参考:原 OpenStock 美股热力图
+ * - 12 行业(按总市值排序)
+ * - 每个行业 1 个 grid item(均匀大小)
+ * - 行业内股票按市值布局(大块/中块/小块)
+ * - 公司 logo:首字母圆形占位(A 股无 logo API)
+ * - 颜色:红涨绿跌(中性用浅灰)
+ * - 行业标签:浅灰小字 + ">" 箭头
  *
  * 数据:Tushare daily + daily_basic + stock_basic
  */
@@ -19,7 +15,6 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { hierarchy, treemap } from 'd3-hierarchy';
 
 interface Stock {
     ts_code: string;
@@ -30,11 +25,66 @@ interface Stock {
     circ_mv?: number;
 }
 
-const WIDTH = 1280;
-const HEIGHT = 720;
-const PADDING = 1;        // 行业内股票间 1px 间隙
-const PADDING_OUTER = 2;  // 行业间 2px 间隙
-const PADDING_TOP = 16;   // 行业标题占 16px
+// 行业 → 颜色(主色,用于 logo 圈)
+const INDUSTRY_COLORS: Record<string, string> = {
+    '银行': '#1e88e5',
+    '半导体': '#7b1fa2',
+    '通信设备': '#00897b',
+    '元器件': '#5e35b1',
+    '电气设备': '#43a047',
+    '石油开采': '#fb8c00',
+    '保险': '#e53935',
+    '电信运营': '#3949ab',
+    '证券': '#00838f',
+    '白酒': '#6a1b9a',
+    '煤炭开采': '#5d4037',
+    '家用电器': '#c62828',
+    '汽车整车': '#0277bd',
+    '医药': '#2e7d32',
+    '小金属': '#f57c00',
+    '钢铁': '#546e7a',
+    '电力': '#00838f',
+    '房地产': '#795548',
+};
+
+// 行业 → emoji(用作 logo 圈内容)
+const INDUSTRY_EMOJI: Record<string, string> = {
+    '银行': '🏦',
+    '半导体': '💎',
+    '通信设备': '📡',
+    '元器件': '🔌',
+    '电气设备': '⚡',
+    '石油开采': '🛢️',
+    '保险': '🛡️',
+    '电信运营': '📱',
+    '证券': '📊',
+    '白酒': '🍶',
+    '煤炭开采': '⛏️',
+    '家用电器': '🏠',
+    '汽车整车': '🚗',
+    '医药': '💊',
+    '小金属': '⚙️',
+    '钢铁': '🏭',
+    '电力': '💡',
+    '房地产': '🏢',
+};
+
+// 颜色:红涨绿跌
+const getColor = (pct: number): string => {
+    if (pct > 0) {
+        const intensity = Math.min(Math.abs(pct) / 5, 1);
+        return `rgba(220, 50, 50, ${0.45 + intensity * 0.45})`;
+    } else if (pct < 0) {
+        const intensity = Math.min(Math.abs(pct) / 5, 1);
+        return `rgba(40, 167, 80, ${0.45 + intensity * 0.45})`;
+    }
+    return 'rgba(60, 60, 70, 0.5)';
+};
+
+// 浅色版本(文字)
+const getTextColor = (pct: number): string => {
+    return 'white';
+};
 
 export default function Heatmap() {
     const [stocks, setStocks] = useState<Stock[]>([]);
@@ -52,176 +102,111 @@ export default function Heatmap() {
             .finally(() => setLoading(false));
     }, []);
 
-    // 构建 treemap 布局:industry → stock
-    const layout = useMemo(() => {
+    // 按行业分组,行业按总市值排序
+    const groupedIndustries = useMemo(() => {
         if (stocks.length === 0) return [];
-
-        // 取有市值的,排序后取前 N 只(增加上限填满空间)
-        const validStocks = stocks
-            .filter(s => (s.total_mv || 0) > 0)
-            .sort((a, b) => b.total_mv - a.total_mv)
-            .slice(0, 350);  // 从 200 → 350 只
 
         // 按 industry 分组
         const byIndustry = new Map<string, Stock[]>();
-        for (const s of validStocks) {
+        for (const s of stocks) {
             const ind = s.industry || '其他';
             if (!byIndustry.has(ind)) byIndustry.set(ind, []);
             byIndustry.get(ind)!.push(s);
         }
 
-        // 限制行业数(前 18 个市值最大,从 16 增到 18)
-        const topIndustries = Array.from(byIndustry.entries())
+        // 取前 12 行业(按总市值)
+        return Array.from(byIndustry.entries())
             .map(([ind, list]) => ({
                 name: ind,
+                stocks: list.sort((a, b) => b.total_mv - a.total_mv).slice(0, 12),  // 每行业最多 12 只
                 totalMv: list.reduce((sum, s) => sum + s.total_mv, 0),
-                count: list.length,
             }))
             .sort((a, b) => b.totalMv - a.totalMv)
-            .slice(0, 18);
-
-        // 行业下最多 50 只(从 30 增到 50)
-        const dataWithChildren = topIndustries.map((ind) => {
-            const stocksInInd = byIndustry.get(ind.name)!.slice(0, 50);
-            return {
-                name: ind.name,
-                value: ind.totalMv,
-                children: stocksInInd.map((s) => ({
-                    name: s.ts_code,
-                    value: s.total_mv,
-                    data: s,
-                    industryName: ind.name,
-                })),
-            };
-        });
-
-        const root = hierarchy<any>({ name: 'root', children: dataWithChildren })
-            .sum((d) => d.value || 0)
-            .sort((a, b) => (b.value || 0) - (a.value || 0));
-
-        // treemap 布局(更紧凑)
-        treemap<any>()
-            .size([WIDTH, HEIGHT])
-            .paddingOuter(PADDING_OUTER)
-            .paddingTop(PADDING_TOP)
-            .paddingInner(PADDING)
-            .round(true)(root);
-
-        return root.descendants();
+            .slice(0, 12);  // 取 12 行业
     }, [stocks]);
-
-    // 颜色:红涨绿跌(A 股惯例)
-    const getColor = (pct: number) => {
-        const intensity = Math.min(Math.abs(pct) / 5, 1);
-        if (pct > 0) {
-            return `rgba(248, 73, 96, ${0.25 + intensity * 0.55})`;
-        } else if (pct < 0) {
-            return `rgba(0, 191, 128, ${0.25 + intensity * 0.55})`;
-        }
-        return 'rgba(120, 120, 120, 0.3)';
-    };
 
     if (loading) return <div className="rounded-lg border border-white/10 bg-[#141414] p-6 min-h-[600px] text-gray-400 text-sm">Loading heatmap...</div>;
     if (error) return <div className="rounded-lg border border-rose-500/30 bg-[#141414] p-6 min-h-[600px] text-rose-400 text-sm">⚠️ {error}</div>;
 
     return (
-        <div className="rounded-lg border border-white/10 bg-[#141414] p-4">
-            <div className="flex justify-between items-center mb-3 px-2">
-                <h3 className="text-lg font-semibold text-white">🔥 A 股热力图(按行业 × 市值)</h3>
-                <span className="text-xs text-gray-500">{stocks.length} 只股票 / 18 大行业 / 面积 ∝ 市值</span>
+        <div className="rounded-lg border border-white/10 bg-[#141414] p-6">
+            <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-semibold text-white">📊 Stock Heatmap</h3>
+                <span className="text-xs text-gray-500">{stocks.length} 只股票 / 12 大行业</span>
             </div>
-            <div className="overflow-x-auto">
-                <svg
-                    viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
-                    preserveAspectRatio="xMidYMid meet"
-                    className="w-full h-auto"
-                    style={{ minHeight: '500px' }}
-                >
-                    {layout.filter(d => d.depth === 2).map((d) => {
-                        // d.depth === 2 是 stock 节点
-                        const s: Stock = d.data.data;
-                        const pct = s.pct_chg || 0;
-                        const w = d.x1 - d.x0;
-                        const h = d.y1 - d.y0;
 
-                        // 字号根据面积自适应(小面积能放下字号即可)
-                        const area = w * h;
-                        const fontSize = area > 4000 ? 14 : area > 2000 ? 12 : area > 800 ? 10 : 9;
-                        const showName = w > 40 && h > 24;
-                        const showPct = w > 30 && h > 18;
+            {/* 4×3 行业 grid(大屏)/ 2 列(中屏)/ 1 列(小屏)*/}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2">
+                {groupedIndustries.map((ind) => {
+                    const mainStock = ind.stocks[0];
+                    const otherStocks = ind.stocks.slice(1);
 
-                        return (
-                            <a
-                                key={d.data.name}
-                                href={`/stocks/${s.ts_code}`}
-                            >
-                                <rect
-                                    x={d.x0}
-                                    y={d.y0}
-                                    width={w}
-                                    height={h}
-                                    fill={getColor(pct)}
-                                    stroke="rgba(0, 0, 0, 0.4)"
-                                    strokeWidth={1}
-                                    className="hover:stroke-white transition cursor-pointer"
-                                />
-                                {showName && (
-                                    <text
-                                        x={d.x0 + 3}
-                                        y={d.y0 + fontSize + 1}
-                                        fill="white"
-                                        fontSize={fontSize}
-                                        fontWeight={600}
-                                        style={{ pointerEvents: 'none', textShadow: '0 1px 2px rgba(0,0,0,0.8)' }}
-                                    >
-                                        {s.name.length > Math.floor(w / (fontSize * 0.55))
-                                            ? s.name.slice(0, Math.floor(w / (fontSize * 0.55)) - 1) + '…'
-                                            : s.name}
-                                    </text>
-                                )}
-                                {showPct && (
-                                    <text
-                                        x={d.x0 + 3}
-                                        y={d.y0 + fontSize * 2 + 3}
-                                        fill="white"
-                                        fontSize={Math.max(fontSize - 2, 9)}
-                                        style={{ pointerEvents: 'none', textShadow: '0 1px 2px rgba(0,0,0,0.8)' }}
-                                    >
-                                        {pct >= 0 ? '+' : ''}{pct.toFixed(2)}%
-                                    </text>
-                                )}
-                                <title>
-                                    {`${s.name} (${s.ts_code})\n行业: ${s.industry}\n涨跌幅: ${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%\n总市值: ¥${(s.total_mv / 1e8).toFixed(0)}亿`}
-                                </title>
-                            </a>
-                        );
-                    })}
+                    return (
+                        <div
+                            key={ind.name}
+                            className="rounded-md overflow-hidden bg-[#0a0a0a] border border-white/5"
+                        >
+                            {/* 行业标题 */}
+                            <div className="px-3 py-1.5 bg-white/[0.04] text-[11px] text-gray-400 font-medium flex items-center gap-1">
+                                {ind.name} <span className="text-gray-600">{'>'}</span>
+                            </div>
 
-                    {/* 行业标题(在每个 industry 块的顶部) */}
-                    {layout.filter(d => d.depth === 1).map((d) => {
-                        const w = d.x1 - d.x0;
-                        if (w < 70) return null;  // 太窄不显示标题
-                        return (
-                            <text
-                                key={`ind-${d.data.name}`}
-                                x={d.x0 + 4}
-                                y={d.y0 + 12}
-                                fill="rgba(255, 255, 255, 0.9)"
-                                fontSize={11}
-                                fontWeight={700}
-                                style={{ pointerEvents: 'none' }}
-                            >
-                                {d.data.name.length > Math.floor(w / 7)
-                                    ? d.data.name.slice(0, Math.floor(w / 7) - 1) + '…'
-                                    : d.data.name}
-                            </text>
-                        );
-                    })}
-                </svg>
+                            {/* 主要股票(NVDA / AAPL 那种大块) */}
+                            {mainStock && (
+                                <a
+                                    href={`/stocks/${mainStock.ts_code}`}
+                                    className="block p-3 hover:ring-1 hover:ring-white/40 transition-all"
+                                    style={{ backgroundColor: getColor(mainStock.pct_chg) }}
+                                    title={`${mainStock.name} ${mainStock.pct_chg >= 0 ? '+' : ''}${mainStock.pct_chg.toFixed(2)}%`}
+                                >
+                                    <div className="flex items-center gap-2">
+                                        <div
+                                            className="w-10 h-10 rounded-full flex items-center justify-center text-lg font-bold text-white shrink-0"
+                                            style={{
+                                                backgroundColor: INDUSTRY_COLORS[ind.name] || '#666',
+                                                boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
+                                            }}
+                                        >
+                                            {INDUSTRY_EMOJI[ind.name] || mainStock.name[0]}
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <div className="text-base font-bold text-white truncate">
+                                                {mainStock.name.length > 4 ? mainStock.name.slice(0, 4) : mainStock.name}
+                                            </div>
+                                            <div className="text-xs text-white/95">
+                                                {mainStock.pct_chg >= 0 ? '+' : ''}{mainStock.pct_chg.toFixed(2)}%
+                                            </div>
+                                        </div>
+                                    </div>
+                                </a>
+                            )}
+
+                            {/* 其他股票(小格子) */}
+                            {otherStocks.length > 0 && (
+                                <div className="grid grid-cols-2 gap-px p-px bg-black/30">
+                                    {otherStocks.map(s => (
+                                        <a
+                                            key={s.ts_code}
+                                            href={`/stocks/${s.ts_code}`}
+                                            className="aspect-[3/1.5] flex items-center px-2 hover:ring-1 hover:ring-white/40 transition-all min-h-[36px]"
+                                            style={{ backgroundColor: getColor(s.pct_chg) }}
+                                            title={`${s.name} ${s.pct_chg >= 0 ? '+' : ''}${s.pct_chg.toFixed(2)}%`}
+                                        >
+                                            <span className="text-[11px] text-white font-medium truncate w-full">
+                                                {s.name}
+                                            </span>
+                                        </a>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    );
+                })}
             </div>
+
             <div className="text-xs text-gray-500 mt-3 px-2 flex justify-between">
                 <span>数据源:Tushare daily + daily_basic + stock_basic</span>
-                <span>红涨绿跌(A 股惯例)─ 颜色深度 ∝ 涨跌幅</span>
+                <span>红涨绿跌(A 股惯例)─ 面积 ∝ 市值</span>
             </div>
         </div>
     );
