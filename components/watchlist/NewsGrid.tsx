@@ -16,9 +16,12 @@ export default function NewsGrid({ news }: NewsGridProps) {
         <div className="mt-8">
             <h2 className="text-xl font-bold text-white mb-4">Market News</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {news.map((item, idx) => (
+                {news.map((item, idx) => {
+                    // 用 url + headline 生成稳定 key(数据无 id)
+                    const stableKey = item.id || item.url || `news-${idx}`;
+                    return (
                     <a
-                        key={idx}
+                        key={stableKey}
                         href={item.url}
                         target="_blank"
                         rel="noopener noreferrer"
@@ -46,7 +49,8 @@ export default function NewsGrid({ news }: NewsGridProps) {
                             </div>
                         </div>
                     </a>
-                ))}
+                    );
+                })}
             </div>
         </div>
     );

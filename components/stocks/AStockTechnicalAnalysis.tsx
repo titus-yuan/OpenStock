@@ -278,7 +278,7 @@ export default function AStockTechnicalAnalysis({ symbol, daysBack = 120 }: Prop
                 <h4 className="text-sm text-gray-400 mb-2">交易信号</h4>
                 <div className="grid grid-cols-2 gap-2 text-xs">
                     {signals.map((s, idx) => (
-                        <div key={idx} className="flex justify-between px-2 py-1 rounded bg-white/5">
+                        <div key={`signal-${s.name}-${idx}`} className="flex justify-between px-2 py-1 rounded bg-white/5">
                             <span className="text-gray-400">{s.name}</span>
                             <span className={s.bullish ? 'text-rose-500' : 'text-emerald-500'}>{s.value}</span>
                         </div>
