@@ -6,7 +6,6 @@
  *   - 深市:000xxx.SZ / 002xxx.SZ(中小板)/ 300xxx.SZ(创业板)
  *   - 北交:830xxx.BJ / 836xxx.BJ
  *
- * OpenStock 现有的 formatSymbolForTradingView 处理美股(NASDAQ:AAPL)
  * 本文件专门处理 A 股
  */
 

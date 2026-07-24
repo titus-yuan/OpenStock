@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo } from 'react';
 import WatchlistStockChip from './WatchlistStockChip';
-import TradingViewWatchlist from './TradingViewWatchlist';
+import AStockWatchlistQuotes from './AStockWatchlistQuotes';
 import { Button } from '@/components/ui/button';
 import { ArrowDownAZ, ArrowUpZA, ArrowUpDown } from 'lucide-react';
 import { WatchlistItem } from '@/database/models/watchlist.model';
@@ -35,6 +35,12 @@ export default function WatchlistManager({ initialItems, userId }: WatchlistMana
     }, [initialItems, sortOrder]);
 
     const watchlistSymbols = sortedItems.map((item) => item.symbol);
+
+    // 构建 symbol → displayName 映射,供 AStockWatchlistQuotes 用
+    const symbolNameMap: Record<string, string> = {};
+    for (const item of sortedItems) {
+        symbolNameMap[item.symbol] = (item as any).company || item.symbol;
+    }
 
     return (
         <div className="space-y-6">
@@ -87,9 +93,11 @@ export default function WatchlistManager({ initialItems, userId }: WatchlistMana
                 )}
             </div>
 
-            <div className="min-h-[550px]">
-                <TradingViewWatchlist symbols={watchlistSymbols} />
-            </div>
+            {/* 替代原 TradingViewWatchlist(已删除),用纯 Tushare A 股行情条 */}
+            <AStockWatchlistQuotes
+                symbols={watchlistSymbols}
+                names={symbolNameMap}
+            />
         </div>
     );
 }
