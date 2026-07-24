@@ -26,19 +26,20 @@ export default function WatchlistTable({ data, userId, onRefresh }: WatchlistTab
     useEffect(() => {
         if (!stocks || stocks.length === 0) return;
 
-        // Poll for price updates every 15 seconds
+        // Poll for price updates every 5 seconds
         const interval = setInterval(async () => {
             try {
-                const symbols = stocks.map(s => s.symbol);
-                if (symbols.length === 0) return;
+                if (stocks.length === 0) return;
 
                 // Dynamic import to avoid server-action issues if directly imported in client component sometimes
-                const { getWatchlistData } = await import('@/lib/actions/finnhub.actions');
-                const updatedData = await getWatchlistData(symbols);
+                const { getWatchlistQuotes } = await import('@/lib/actions/watchlist-tushare.actions');
+                const updatedData = await getWatchlistQuotes(
+                    stocks.map((s: any) => ({ symbol: s.symbol, name: s.name }))
+                );
 
                 if (updatedData && updatedData.length > 0) {
                     setStocks(current => {
-                        const map = new Map(updatedData.map(item => [item.symbol, item]));
+                        const map = new Map(updatedData.map((item: any) => [item.symbol, item]));
                         return current.map(existing => {
                             const fresh = map.get(existing.symbol);
                             if (fresh) {
@@ -47,6 +48,7 @@ export default function WatchlistTable({ data, userId, onRefresh }: WatchlistTab
                                     price: fresh.price,
                                     change: fresh.change,
                                     changePercent: fresh.changePercent,
+                                    currency: fresh.currency,
                                 };
                             }
                             return existing;
@@ -118,7 +120,7 @@ export default function WatchlistTable({ data, userId, onRefresh }: WatchlistTab
                                     {formatCurrency(stock.price)}
                                 </td>
                                 <td className={`px-6 py-4 font-medium`}>
-                                    <div className={`flex items-center w-fit px-2 py-1 rounded-md ${isPositive ? "bg-green-500/10 text-green-400" : "bg-red-500/10 text-red-400"}`}>
+                                    <div className={`flex items-center w-fit px-2 py-1 rounded-md ${isPositive ? "bg-rose-500/10 text-rose-500" : "bg-emerald-500/10 text-emerald-500"}`}>
                                         {isPositive ? <ArrowUp className="w-3.5 h-3.5 mr-1.5" /> : <ArrowDown className="w-3.5 h-3.5 mr-1.5" />}
                                         {Math.abs(stock.changePercent).toFixed(2)}%
                                     </div>

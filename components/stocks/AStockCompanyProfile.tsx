@@ -9,6 +9,20 @@
 import { useEffect, useState } from 'react';
 import { formatSymbolForTushare } from '@/lib/tushare/mapping';
 
+/**
+ * Tushare fina_indicator 的 ratio 字段是 0-1 小数形式
+ * (例如 ROE = 0.1057 表示 10.57%)
+ * 但有少数字段可能是 0-100 整数,这个函数自动判断
+ */
+function formatRatio(v: number | string | null | undefined): string {
+    if (v == null) return '—';
+    const n = typeof v === 'string' ? parseFloat(v) : v;
+    if (isNaN(n)) return '—';
+    // 智能判断:如果值大于 1,说明已经是百分比形式
+    if (Math.abs(n) > 1) return `${n.toFixed(2)}%`;
+    return `${(n * 100).toFixed(2)}%`;
+}
+
 interface Props {
     symbol: string;
 }
@@ -83,12 +97,12 @@ export default function AStockCompanyProfile({ symbol }: Props) {
                 <div>
                     <h3 className="text-lg font-semibold text-white mb-3">💰 财务指标(最新)</h3>
                     <dl className="grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-2 text-sm">
-                        {indicator[0].eps && <div><dt className="text-gray-500 text-xs">EPS(每股收益)</dt><dd className="text-white">¥{indicator[0].eps}</dd></div>}
-                        {indicator[0].roe && <div><dt className="text-gray-500 text-xs">ROE</dt><dd className="text-white">{(indicator[0].roe * 100).toFixed(2)}%</dd></div>}
-                        {indicator[0].roa && <div><dt className="text-gray-500 text-xs">ROA</dt><dd className="text-white">{(indicator[0].roa * 100).toFixed(2)}%</dd></div>}
-                        {indicator[0].grossprofit_margin && <div><dt className="text-gray-500 text-xs">毛利率</dt><dd className="text-white">{(indicator[0].grossprofit_margin * 100).toFixed(2)}%</dd></div>}
-                        {indicator[0].netprofit_margin && <div><dt className="text-gray-500 text-xs">净利率</dt><dd className="text-white">{(indicator[0].netprofit_margin * 100).toFixed(2)}%</dd></div>}
-                        {indicator[0].debt_to_assets && <div><dt className="text-gray-500 text-xs">资产负债率</dt><dd className="text-white">{(indicator[0].debt_to_assets * 100).toFixed(2)}%</dd></div>}
+                        {indicator[0].eps != null && <div><dt className="text-gray-500 text-xs">EPS(每股收益)</dt><dd className="text-white">¥{indicator[0].eps}</dd></div>}
+                        {indicator[0].roe != null && <div><dt className="text-gray-500 text-xs">ROE</dt><dd className="text-white">{formatRatio(indicator[0].roe)}</dd></div>}
+                        {indicator[0].roa != null && <div><dt className="text-gray-500 text-xs">ROA</dt><dd className="text-white">{formatRatio(indicator[0].roa)}</dd></div>}
+                        {indicator[0].grossprofit_margin != null && <div><dt className="text-gray-500 text-xs">毛利率</dt><dd className="text-white">{formatRatio(indicator[0].grossprofit_margin)}</dd></div>}
+                        {indicator[0].netprofit_margin != null && <div><dt className="text-gray-500 text-xs">净利率</dt><dd className="text-white">{formatRatio(indicator[0].netprofit_margin)}</dd></div>}
+                        {indicator[0].debt_to_assets != null && <div><dt className="text-gray-500 text-xs">资产负债率</dt><dd className="text-white">{formatRatio(indicator[0].debt_to_assets)}</dd></div>}
                     </dl>
                 </div>
             )}

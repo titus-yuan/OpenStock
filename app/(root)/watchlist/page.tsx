@@ -4,7 +4,7 @@ import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { getUserWatchlist } from '@/lib/actions/watchlist.actions';
 import { getUserAlerts } from '@/lib/actions/alert.actions';
-import { getNews } from '@/lib/actions/finnhub.actions';
+import { getMajorNews } from '@/lib/tushare/actions';
 import WatchlistManager from '@/components/watchlist/WatchlistManager';
 import AlertsPanel from '@/components/watchlist/AlertsPanel';
 import NewsGrid from '@/components/watchlist/NewsGrid';
@@ -26,13 +26,13 @@ export default async function WatchlistPage() {
     const [watchlistItems, alerts, news] = await Promise.all([
         getUserWatchlist(userId),
         getUserAlerts(userId),
-        getNews() // Initial news fetch
+        getMajorNews(7) // 改用 Tushare 大盘新闻
     ]);
 
     const watchlistSymbols = watchlistItems.map((item: any) => item.symbol);
 
-    // Fallback news if watchlist has items
-    const relevantNews = watchlistSymbols.length > 0 ? await getNews(watchlistSymbols) : news;
+    // watchlist 关联新闻(个股新闻 5000 档不支持,统一用大盘新闻)
+    const relevantNews = watchlistSymbols.length > 0 ? news : news;
 
     return (
         <div className="min-h-screen bg-black text-gray-100 p-6 md:p-8">
